@@ -63,6 +63,7 @@ Create a `.env` file in the engine's app directory (or the Django project root):
 DATABASE_URL=postgres://saasclaw:yourpassword@localhost:5432/saasclaw
 SECRET_KEY=your-secret-key-here
 SAASCLAW_SINGLE_USER=true
+SAASCLAW_SINGLE_USER_PASSWORD=your-secure-password
 
 # Allowed hosts (add your domain)
 ALLOWED_HOSTS=localhost,127.0.0.1,your-domain.com
@@ -197,6 +198,7 @@ services:
       - DATABASE_URL=postgres://saasclaw:password@postgres:5432/saasclaw
       - SECRET_KEY=change-me-to-a-random-string
       - SAASCLAW_SINGLE_USER=true
+      - SAASCLAW_SINGLE_USER_PASSWORD=your-secure-password
       - ALLOWED_HOSTS=localhost,your-domain.com
       - CORS_ALLOWED_ORIGINS=https://your-domain.com,http://localhost:5173
       - OPENCLAW_API_URL=http://host.docker.internal:18789
@@ -243,11 +245,43 @@ volumes:
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `SECRET_KEY` | Yes | Django secret key |
 | `SAASCLAW_SINGLE_USER` | No | Set to `true` for single-user mode |
+| `SAASCLAW_SINGLE_USER_PASSWORD` | No* | Password for single-user mode login. Required if `SAASCLAW_SINGLE_USER=true` and exposed to the internet. If empty, any non-empty password is accepted (local dev only). |
 | `ALLOWED_HOSTS` | Yes | Comma-separated list of allowed hosts |
 | `CSRF_TRUSTED_ORIGINS` | Yes | Comma-separated list of trusted origins |
 | `CORS_ALLOWED_ORIGINS` | Yes | Comma-separated list of allowed CORS origins |
 | `OPENCLAW_API_URL` | Yes | OpenClaw gateway URL for agent chat |
 | `OPENCLAW_API_KEY` | Yes | OpenClaw API key |
+
+## Security
+
+### Authentication
+
+All API endpoints (except login/register) require a valid JWT access token obtained via `/api/v1/auth/login/`.
+
+**Rate limiting**: Login and registration are rate-limited to 5 requests per minute per IP address.
+
+**Single-user mode** (`SAASCLAW_SINGLE_USER=true`):
+- Login still requires a password — set `SAASCLAW_SINGLE_USER_PASSWORD` to a strong password.
+- If `SAASCLAW_SINGLE_USER_PASSWORD` is not set, any non-empty password is accepted (**local dev only — do not use in production**).
+- All authenticated requests resolve to the admin user regardless of which user the JWT belongs to.
+
+**Multi-user mode** (default):
+- Standard email/password authentication.
+- Each user can only access their own projects (owner-scoped).
+- Registration is enabled by default.
+
+### Owner Scoping
+
+All project endpoints enforce owner scoping — users can only access projects they own. The API returns 404 (not 403) for projects owned by other users to avoid leaking project existence.
+
+### Path Traversal Protection
+
+File read/write endpoints validate paths against the project workspace root. Paths like `../../../etc/passwd` are rejected.
+
+### CSRF
+
+All API endpoints are CSRF-exempt since they use JWT authentication (not cookies).
+
 
 ### Starter App
 
