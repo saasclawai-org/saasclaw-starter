@@ -72,7 +72,7 @@ export function streamChat(
 
   ;(async () => {
     try {
-      const res = await fetch(`${API_BASE}/projects/${slug}/sessions/${sessionId}/send`, {
+      const res = await fetch(`${API_BASE}/projects/${slug}/sessions/${sessionId}/send/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
