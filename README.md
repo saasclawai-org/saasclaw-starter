@@ -266,9 +266,53 @@ When you deploy a project, the engine:
 5. Reloads nginx
 
 For this to work, you need:
-- A wildcard DNS record: `*.saasclaw.ai → your server IP`
-- A wildcard SSL certificate: `*.saasclaw.ai` (e.g., Let's Encrypt DNS-01 challenge)
+- A wildcard DNS record: `*.yourdomain.ai → your server IP`
+- A wildcard SSL certificate: `*.yourdomain.ai` (see below)
 - nginx with the wildcard cert configured for project subdomains
+
+### DNS Setup
+
+Each deployed project gets its own subdomain (e.g., `my-app.yourdomain.ai`). You need a wildcard DNS record so all subdomains resolve to your server:
+
+1. **In your DNS provider** (Cloudflare, Route53, etc.), add a wildcard A record:
+   - Type: `A`
+   - Name: `*`
+   - Value: `your server IP` (e.g., `167.233.19.85`)
+   - TTL: Auto or 300
+
+2. **If using Cloudflare**, you have two options:
+   - **Proxied (orange cloud):** Cloudflare handles SSL automatically, but requires a Cloudflare origin certificate on the server. Traffic goes through Cloudflare's CDN.
+   - **DNS-only (grey cloud):** Traffic goes directly to your server. You need your own SSL cert (e.g., Let's Encrypt wildcard). Simpler for self-hosting.
+
+3. **Also add** an A record for the starter app itself:
+   - Type: `A`
+   - Name: `starter` (or `app`, or your preferred subdomain)
+   - Value: same server IP
+
+### SSL Certificates
+
+For project subdomains, you need a wildcard certificate:
+
+```bash
+# Install certbot
+sudo apt install certbot python3-certbot-nginx
+
+# Get a wildcard cert (requires DNS-01 challenge — you need API access to your DNS provider)
+sudo certbot certonly --manual --preferred-challenges dns \
+  -d '*.yourdomain.ai' -d 'yourdomain.ai' \
+  --agree-tos -m you@example.com
+
+# Or, if using Cloudflare with proxied DNS, use a Cloudflare origin certificate instead:
+# https://dash.cloudflare.com/ssl/tls/origin
+```
+
+> **Tip:** If all your subdomains are proxied through Cloudflare, you can use Cloudflare's free origin certificate instead of Let's Encrypt. The origin cert is valid for `*.yourdomain.ai` and `yourdomain.ai`.
+
+The wildcard cert should be placed at:
+- `/etc/letsencrypt/live/yourdomain.ai/fullchain.pem`
+- `/etc/letsencrypt/live/yourdomain.ai/privkey.pem`
+
+Project nginx configs reference these paths automatically.
 
 ## What's Included
 
