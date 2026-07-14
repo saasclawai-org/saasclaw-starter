@@ -13,6 +13,8 @@ export function DeployPanel({ slug }: DeployPanelProps) {
   const [history, setHistory] = useState<Deployment[]>([])
   const [deploying, setDeploying] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [deployResult, setDeployResult] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchStatus = async () => {
     if (!token) return
@@ -21,9 +23,11 @@ export function DeployPanel({ slug }: DeployPanelProps) {
         deploy.status(token, slug).catch(() => null),
         deploy.history(token, slug),
       ])
-      setCurrentDeploy(status)
+      if (status) setCurrentDeploy(status)
       setHistory(hist)
-    } catch {} finally {
+    } catch {
+      // Ignore — panel still renders
+    } finally {
       setLoading(false)
     }
   }
@@ -35,11 +39,15 @@ export function DeployPanel({ slug }: DeployPanelProps) {
   const handleDeploy = async () => {
     if (!token || deploying) return
     setDeploying(true)
+    setError(null)
+    setDeployResult(null)
     try {
-      await deploy.trigger(token, slug)
+      const result = await deploy.trigger(token, slug)
+      setDeployResult(result.result || null)
+      setCurrentDeploy(result)
       await fetchStatus()
     } catch (err) {
-      alert(`Deploy failed: ${(err as Error).message}`)
+      setError((err as Error).message || 'Deploy failed')
     } finally {
       setDeploying(false)
     }
@@ -47,7 +55,9 @@ export function DeployPanel({ slug }: DeployPanelProps) {
 
   const statusColor = (status: string) => {
     switch (status) {
+      case 'completed':
       case 'success':
+      case 'deployed':
       case 'active':
         return 'text-green-400'
       case 'failed':
@@ -73,12 +83,12 @@ export function DeployPanel({ slug }: DeployPanelProps) {
   return (
     <div className="mx-auto max-w-3xl p-6">
       {/* Deploy button */}
-      <div className="mb-8 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+      <div className="mb-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-[var(--color-text)]">Preview Deploy</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text)]">Deploy</h3>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-              Build and deploy to your preview domain
+              Build and deploy your project
             </p>
           </div>
           <button
@@ -101,6 +111,8 @@ export function DeployPanel({ slug }: DeployPanelProps) {
             )}
           </button>
         </div>
+
+        {/* Deploy URL */}
         {currentDeploy?.url && (
           <a
             href={currentDeploy.url}
@@ -111,7 +123,33 @@ export function DeployPanel({ slug }: DeployPanelProps) {
             {currentDeploy.url} ↗
           </a>
         )}
+
+        {/* Current status */}
+        {currentDeploy?.status && !deployResult && (
+          <div className="mt-3">
+            <span className={`text-sm font-medium ${statusColor(currentDeploy.status)}`}>
+              {currentDeploy.status}
+            </span>
+          </div>
+        )}
       </div>
+
+      {/* Deploy result */}
+      {deployResult && (
+        <div className="mb-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <h4 className="mb-2 text-sm font-medium text-[var(--color-text)]">Deploy Output</h4>
+          <pre className="max-h-60 overflow-auto rounded-lg bg-[var(--color-bg)] p-3 text-xs text-[var(--color-text-secondary)]">
+            {deployResult}
+          </pre>
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4">
+          <p className="text-sm text-red-400">{error}</p>
+        </div>
+      )}
 
       {/* Deploy history */}
       <div>
@@ -135,7 +173,7 @@ export function DeployPanel({ slug }: DeployPanelProps) {
                     </span>
                   </div>
                   <span className="text-xs text-[var(--color-text-muted)]">
-                    {formatDate(d.created_at)}
+                    {d.created_at ? formatDate(d.created_at) : ''}
                   </span>
                 </div>
                 {d.url && (
