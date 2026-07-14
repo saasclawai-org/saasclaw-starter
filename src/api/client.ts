@@ -288,6 +288,8 @@ export interface Deployment {
   environment: string
   status: string
   url: string
+  web_root?: string
+  result?: string
   created_at: string
   finished_at?: string
   logs?: string
