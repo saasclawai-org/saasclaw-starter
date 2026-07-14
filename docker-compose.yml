@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  engine:
+    image: saasclaw/engine:latest
+    environment:
+      - DATABASE_URL=postgres://saasclaw:saasclaw@postgres:5432/saasclaw
+      - SAASCLAW_SINGLE_USER=true
+      - DJANGO_SETTINGS_MODULE=config.settings
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  starter:
+    build: .
+    environment:
+      - VITE_API_URL=http://localhost:8000/api/v1
+    ports:
+      - "3000:80"
+    depends_on:
+      - engine
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=saasclaw
+      - POSTGRES_USER=saasclaw
+      - POSTGRES_PASSWORD=saasclaw
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saasclaw"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
