@@ -41,9 +41,14 @@ async function request<T>(
   if (!res.ok) {
     let data: unknown
     try {
-      data = await res.json()
-    } catch {
       data = await res.text()
+      try {
+        data = JSON.parse(data as string)
+      } catch {
+        // not JSON, keep as text
+      }
+    } catch {
+      data = null
     }
     throw new ApiError(res.status, data)
   }
