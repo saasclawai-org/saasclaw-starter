@@ -14,6 +14,11 @@ const FRAMEWORK_ICONS: Record<string, string> = {
   django: '🐍',
   supabase: '⚡',
   firebase: '🔥',
+  flask: '🫙',
+  dotnet: '🔷',
+  'react-dotnet': '🔷',
+  'spring-boot': '☕',
+  'react-django': '🐍',
 }
 
 export function ProjectCard({ project }: ProjectCardProps) {

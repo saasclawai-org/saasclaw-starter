@@ -14,6 +14,10 @@ const FRAMEWORKS = [
   { id: 'django', name: 'Django', icon: '🐍', desc: 'Python web framework' },
   { id: 'html', name: 'HTML/CSS/JS', icon: '🌐', desc: 'Plain static site' },
   { id: 'supabase', name: 'React + Supabase', icon: '⚡', desc: 'React with Supabase backend' },
+  { id: 'flask', name: 'Flask', icon: '🫙', desc: 'Lightweight Python web framework' },
+  { id: 'dotnet', name: '.NET', icon: '🔷', desc: 'ASP.NET Core with C#' },
+  { id: 'react-dotnet', name: 'React + .NET', icon: '🔷', desc: 'React frontend with .NET API' },
+  { id: 'spring-boot', name: 'Spring Boot', icon: '☕', desc: 'Java with Spring Boot 3.x' },
 ]
 
 export function NewProject({ onClose }: NewProjectProps) {
