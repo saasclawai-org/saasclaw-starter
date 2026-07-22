@@ -18,6 +18,33 @@ class ApiError extends Error {
   }
 }
 
+/** Helper: read refresh token from localStorage (zustand persist) */
+function getStoredRefreshToken(): string | null {
+  try {
+    const raw = localStorage.getItem('saasclaw-auth')
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return parsed?.state?.refreshToken ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Helper: update access token in localStorage (zustand persist) */
+function updateStoredToken(newToken: string) {
+  try {
+    const raw = localStorage.getItem('saasclaw-auth')
+    if (!raw) return
+    const parsed = JSON.parse(raw)
+    if (parsed?.state) {
+      parsed.state.token = newToken
+      localStorage.setItem('saasclaw-auth', JSON.stringify(parsed))
+    }
+  } catch {
+    // localStorage unavailable or corrupted
+  }
+}
+
 async function request<T>(
   path: string,
   options: FetchOptions = {},
@@ -33,10 +60,32 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  let res = await fetch(`${API_BASE}${path}`, {
     ...rest,
     headers,
   })
+
+  // On 401, try to refresh the token once and retry
+  if (res.status === 401 && token) {
+    const refreshToken = getStoredRefreshToken()
+    if (refreshToken) {
+      try {
+        const refreshRes = await fetch(`${API_BASE}/auth/refresh/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh: refreshToken }),
+        })
+        if (refreshRes.ok) {
+          const { access } = await refreshRes.json()
+          updateStoredToken(access)
+          headers['Authorization'] = `Bearer ${access}`
+          res = await fetch(`${API_BASE}${path}`, { ...rest, headers })
+        }
+      } catch {
+        // refresh failed — let original 401 propagate
+      }
+    }
+  }
 
   if (!res.ok) {
     let data: unknown
@@ -76,9 +125,27 @@ export function streamChat(
 ): AbortController {
   const ctrl = new AbortController()
 
-  ;(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/projects/${slug}/sessions/${sessionId}/send/`, {
+  async function doFetch(): Promise<Response> {
+    const res = await fetch(`${API_BASE}/projects/${slug}/sessions/${sessionId}/send/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(model ? { message, model } : { message }),
+      signal: ctrl.signal,
+    })
+
+    // On 409 (session stuck), reset and retry once
+    if (res.status === 409) {
+      try {
+        await fetch(`${API_BASE}/projects/${slug}/sessions/${sessionId}/reset/`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      } catch { /* ignore reset failure */ }
+      // Retry the original request
+      return fetch(`${API_BASE}/projects/${slug}/sessions/${sessionId}/send/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -87,6 +154,14 @@ export function streamChat(
         body: JSON.stringify(model ? { message, model } : { message }),
         signal: ctrl.signal,
       })
+    }
+
+    return res
+  }
+
+  ;(async () => {
+    try {
+      const res = await doFetch()
 
       if (!res.ok || !res.body) {
         throw new Error(`Stream error: ${res.status}`)
@@ -245,6 +320,12 @@ export const sessions = {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ message }),
+    }),
+
+  reset: (token: string, slug: string, id: string) =>
+    request<void>(`/projects/${slug}/sessions/${id}/reset/`, {
+      token,
+      method: 'POST',
     }),
 
   end: (token: string, slug: string, id: string) =>
