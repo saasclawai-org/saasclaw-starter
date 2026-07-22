@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useAuthStore } from '../../stores/auth'
 import { useChatStore } from '../../stores/chat'
-import { streamChat } from '../../api/client'
+import { streamChat, MODELS, type ModelOption } from '../../api/client'
 import { MessageBubble } from './MessageBubble'
 
 interface ChatPanelProps {
@@ -28,6 +28,8 @@ export function ChatPanel({ slug }: ChatPanelProps) {
 
   const [input, setInput] = useState('')
   const [showSessions, setShowSessions] = useState(false)
+  const [selectedModel, setSelectedModel] = useState('zai/glm-5-turbo')
+  const [showModelPicker, setShowModelPicker] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -105,15 +107,24 @@ export function ChatPanel({ slug }: ChatPanelProps) {
         setStreaming(false)
         setAbortController(null)
       },
+      selectedModel,
     )
 
     setAbortController(ctrl)
-  }, [input, token, currentSessionId, slug])
+  }, [input, token, currentSessionId, slug, selectedModel])
 
   const handleStop = useCallback(() => {
     useChatStore.getState().abortController?.abort()
     setStreaming(false)
   }, [])
+
+  // Close model picker on outside click
+  useEffect(() => {
+    if (!showModelPicker) return
+    const handler = () => setShowModelPicker(false)
+    setTimeout(() => document.addEventListener('click', handler), 0)
+    return () => document.removeEventListener('click', handler)
+  }, [showModelPicker])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -194,6 +205,58 @@ export function ChatPanel({ slug }: ChatPanelProps) {
               Thinking...
             </span>
           )}
+          <div className="flex-1" />
+          {/* Model picker */}
+          <div className="relative">
+            <button
+              onClick={() => setShowModelPicker(!showModelPicker)}
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--color-surface-2)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-2-hover)] hover:text-[var(--color-text)]"
+            >
+              {MODELS.find(m => m.gatewayModel === selectedModel)?.label ?? selectedModel}
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showModelPicker && (
+              <div className="absolute right-0 top-full z-50 mt-1 max-h-96 w-64 overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl">
+                {Object.entries(
+                  MODELS.reduce((acc, m) => {
+                    const key = m.isPlatform ? '⚡ Platform — Free' : `🔑 ${m.provider.charAt(0).toUpperCase() + m.provider.slice(1)}`
+                    if (!acc[key]) acc[key] = []
+                    acc[key].push(m)
+                    return acc
+                  }, {} as Record<string, ModelOption[]>)
+                ).map(([group, models]) => (
+                  <div key={group}>
+                    <div className="border-b border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                      {group}
+                    </div>
+                    {models.map((m) => (
+                      <button
+                        key={m.gatewayModel}
+                        onClick={() => {
+                          setSelectedModel(m.gatewayModel)
+                          setShowModelPicker(false)
+                        }}
+                        className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition hover:bg-[var(--color-surface-2)] ${
+                          selectedModel === m.gatewayModel
+                            ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                            : 'text-[var(--color-text-secondary)]'
+                        }`}
+                      >
+                        {m.label}
+                        {selectedModel === m.gatewayModel && (
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Messages */}

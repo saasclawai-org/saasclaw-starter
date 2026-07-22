@@ -72,6 +72,7 @@ export function streamChat(
   onChunk: (chunk: { type: string; content?: string; tool_call?: unknown }) => void,
   onDone: () => void,
   onError: (err: Error) => void,
+  model?: string,
 ): AbortController {
   const ctrl = new AbortController()
 
@@ -83,7 +84,7 @@ export function streamChat(
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify(model ? { message, model } : { message }),
         signal: ctrl.signal,
       })
 
@@ -381,4 +382,100 @@ export const infra = {
 
   logs: (token: string, slug: string, source: string, lines = 50) =>
     request<string>(`/projects/${slug}/logs/${source}/?lines=${lines}`, { token }),
+}
+
+// ---- Models ----
+
+export interface ModelOption {
+  gatewayModel: string
+  label: string
+  provider: string
+  isPlatform: boolean
+  needsKey: boolean
+  hasVision: boolean
+}
+
+export const MODELS: ModelOption[] = [
+  // ⚡ Platform — Free
+  { gatewayModel: 'zai/glm-5-turbo', label: 'GLM-5-Turbo (Free)', provider: 'zai', isPlatform: true, needsKey: false, hasVision: false },
+  { gatewayModel: 'zai/glm-5.1', label: 'GLM-5.1', provider: 'zai', isPlatform: true, needsKey: false, hasVision: false },
+  { gatewayModel: 'openai/gpt-5.5', label: 'GPT-5.5 👁', provider: 'openai', isPlatform: false, needsKey: true, hasVision: true },
+  { gatewayModel: 'openai/gpt-5.4-mini', label: 'GPT-5.4 mini 👁', provider: 'openai', isPlatform: false, needsKey: true, hasVision: true },
+  { gatewayModel: 'openai/gpt-5.4-nano', label: 'GPT-5.4 nano 👁', provider: 'openai', isPlatform: false, needsKey: true, hasVision: true },
+  { gatewayModel: 'anthropic/claude-fable-5', label: 'Fable 5 👁', provider: 'anthropic', isPlatform: false, needsKey: true, hasVision: true },
+  { gatewayModel: 'anthropic/claude-opus-4-8', label: 'Opus 4.8 👁', provider: 'anthropic', isPlatform: false, needsKey: true, hasVision: true },
+  { gatewayModel: 'anthropic/claude-sonnet-4-6', label: 'Sonnet 4.6 👁', provider: 'anthropic', isPlatform: false, needsKey: true, hasVision: true },
+  { gatewayModel: 'anthropic/claude-haiku-4-5', label: 'Haiku 4.5 👁', provider: 'anthropic', isPlatform: false, needsKey: true, hasVision: true },
+  // 🔑 Kimi (Moonshot)
+  { gatewayModel: 'moonshot/kimi-k3', label: 'Kimi K3 👁', provider: 'moonshot', isPlatform: false, needsKey: true, hasVision: true },
+  { gatewayModel: 'moonshot/kimi-k2', label: 'Kimi K2', provider: 'moonshot', isPlatform: false, needsKey: true, hasVision: false },
+  // 🦙 Ollama Cloud
+  { gatewayModel: 'ollama-cloud/glm-5.2', label: 'GLM-5.2', provider: 'ollama-cloud', isPlatform: false, needsKey: true, hasVision: false },
+  { gatewayModel: 'ollama-cloud/deepseek-v4-pro', label: 'DeepSeek V4 Pro', provider: 'ollama-cloud', isPlatform: false, needsKey: true, hasVision: false },
+  { gatewayModel: 'ollama-cloud/kimi-k2.7-code', label: 'Kimi K2.7 Code', provider: 'ollama-cloud', isPlatform: false, needsKey: true, hasVision: false },
+  { gatewayModel: 'ollama-cloud/nemotron-3-ultra', label: 'Nemotron 3 Ultra', provider: 'ollama-cloud', isPlatform: false, needsKey: true, hasVision: false },
+  { gatewayModel: 'ollama-cloud/qwen3.5:397b', label: 'Qwen 3.5 (397B)', provider: 'ollama-cloud', isPlatform: false, needsKey: true, hasVision: false },
+  { gatewayModel: 'ollama-cloud/gpt-oss:120b', label: 'GPT-OSS 120B', provider: 'ollama-cloud', isPlatform: false, needsKey: true, hasVision: false },
+  // ⚡ Groq
+  { gatewayModel: 'groq/openai/gpt-oss-120b', label: 'GPT-OSS 120B (Groq)', provider: 'groq', isPlatform: false, needsKey: true, hasVision: false },
+]
+
+export const PROVIDER_LABELS: Record<string, string> = {
+  'zai': 'Z.ai',
+  'openai': 'OpenAI',
+  'anthropic': 'Anthropic',
+  'moonshot': 'Moonshot',
+  'ollama-cloud': 'Ollama Cloud',
+  'groq': 'Groq',
+}
+
+// ---- Account / Provider Keys ----
+
+export interface UserProfile {
+  email: string
+  username: string
+  first_name: string
+  last_name: string
+  date_joined: string
+  social_accounts: Array<{ provider: string; name: string; email: string }>
+  stats: { projects: number; deploys: number; api_keys: number }
+  provider_keys: ProviderKeyInfo[]
+}
+
+export interface ProviderKeyInfo {
+  id: number
+  provider: string
+  api_key_masked: string
+  default_model: string
+  is_active: boolean
+  is_platform: boolean
+  created_at: string
+}
+
+export const account = {
+  profile: (token: string) =>
+    request<UserProfile>('/account/', { token }),
+
+  listProviderKeys: (token: string) =>
+    request<ProviderKeyInfo[]>('/account/provider-keys/', { token }),
+
+  addProviderKey: (token: string, data: { provider: string; api_key: string; default_model?: string }) =>
+    request<ProviderKeyInfo>('/account/provider-keys/', {
+      token,
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateProviderKey: (token: string, id: number, data: { provider: string; api_key: string; default_model?: string }) =>
+    request<ProviderKeyInfo>(`/account/provider-keys/${id}/`, {
+      token,
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteProviderKey: (token: string, id: number) =>
+    request<void>(`/account/provider-keys/${id}/`, {
+      token,
+      method: 'DELETE',
+    }),
 }

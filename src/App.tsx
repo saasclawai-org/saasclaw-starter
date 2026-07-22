@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard'
 import { ProjectView } from './pages/ProjectView'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
+import { Account } from './pages/Account'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token)
@@ -25,6 +26,7 @@ export default function App() {
               <AppShell>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/account" element={<Account />} />
                   <Route path="/:slug" element={<ProjectView />} />
                 </Routes>
               </AppShell>

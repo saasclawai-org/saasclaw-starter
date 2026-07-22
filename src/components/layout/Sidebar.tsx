@@ -57,12 +57,16 @@ export function Sidebar() {
       {/* User */}
       <div className="border-t border-[var(--color-border)] p-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-primary-dim)] text-xs font-medium text-white">
+          <Link
+            to="/account"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-primary-dim)] text-xs font-medium text-white transition hover:opacity-80"
+            title="Account"
+          >
             {email?.[0]?.toUpperCase() || '?'}
-          </div>
-          <div className="flex-1 truncate text-sm text-[var(--color-text-secondary)]">
+          </Link>
+          <Link to="/account" className="flex-1 truncate text-sm text-[var(--color-text-secondary)] transition hover:text-[var(--color-text)]">
             {email}
-          </div>
+          </Link>
           <button
             onClick={() => {
               logout()
