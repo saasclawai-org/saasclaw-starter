@@ -56,6 +56,7 @@ export function DeployPanel({ slug }: DeployPanelProps) {
   const statusColor = (status: string) => {
     switch (status) {
       case 'completed':
+      case 'succeeded':
       case 'success':
       case 'deployed':
       case 'active':
